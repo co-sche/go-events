@@ -4,46 +4,50 @@
 
 package events
 
-import (
-	"reflect"
-)
+type Event interface{}
 
-type Listener func(...interface{})
+type EventListener struct {
+	callback func(...Event)
+}
 
 type EventEmitter struct {
-	events map[string][]Listener
+	events map[string][]*EventListener
+}
+
+func NewEventListener(callback func(...Event)) *EventListener {
+	return &EventListener{callback}
 }
 
 func NewEventEmitter() *EventEmitter {
 	ee := new(EventEmitter)
-	ee.events = make(map[string][]Listener)
+	ee.events = make(map[string][]*EventListener)
 	return ee
 }
 
-func (ee *EventEmitter) Emit(eventName string, args ...interface{}) bool {
+func (ee *EventEmitter) Emit(eventName string, args ...Event) bool {
 	for _, listener := range ee.events[eventName] {
-		listener(args...)
+		listener.callback(args...)
 	}
 	return true
 }
 
-func (ee *EventEmitter) On(eventName string, listener Listener) *EventEmitter {
+func (ee *EventEmitter) On(eventName string, listener *EventListener) *EventEmitter {
 	ee.events[eventName] = append(ee.events[eventName], listener)
 	ee.Emit("newListener", eventName, listener)
 	return ee
 }
 
-func (ee *EventEmitter) AddListener(eventName string, listener Listener) *EventEmitter {
+func (ee *EventEmitter) AddListener(eventName string, listener *EventListener) *EventEmitter {
 	return ee.On(eventName, listener)
 }
 
-func (ee *EventEmitter) PrependListener(eventName string, listener Listener) *EventEmitter {
-	ee.events[eventName] = append([]Listener{listener}, ee.events[eventName][0:]...)
+func (ee *EventEmitter) PrependListener(eventName string, listener *EventListener) *EventEmitter {
+	ee.events[eventName] = append([]*EventListener{listener}, ee.events[eventName][0:]...)
 	ee.Emit("newListener", eventName, listener)
 	return ee
 }
 
-func (ee *EventEmitter) RemoveListener(eventName string, listener Listener) *EventEmitter {
+func (ee *EventEmitter) RemoveListener(eventName string, listener *EventListener) *EventEmitter {
 	ee.events[eventName] = omit(ee.events[eventName], listener)
 	if ee.ListenerCount(eventName) == 0 {
 		delete(ee.events, eventName)
@@ -54,14 +58,14 @@ func (ee *EventEmitter) RemoveListener(eventName string, listener Listener) *Eve
 
 func (ee *EventEmitter) RemoveAllListeners(eventName ...string) *EventEmitter {
 	if len(eventName) == 0 {
-		ee.events = make(map[string][]Listener)
+		ee.events = make(map[string][]*EventListener)
 	} else {
 		delete(ee.events, eventName[0])
 	}
 	return ee
 }
 
-func (ee *EventEmitter) Listeners(eventName string) []Listener {
+func (ee *EventEmitter) Listeners(eventName string) []*EventListener {
 	return ee.events[eventName]
 }
 
@@ -99,23 +103,19 @@ func (ee *EventEmitter) SetMaxListeners(n uint) *EventEmitter {
 }
 */
 
-func omit(fs []Listener, f Listener) []Listener {
+func omit(fs []*EventListener, f *EventListener) []*EventListener {
 	for i := len(fs) - 1; i >= 0; i-- {
-		if eq(f, fs[i]) {
+		if f == fs[i] {
 			fs = del(fs, i)
 		}
 	}
 	return fs
 }
 
-func del(fs[]Listener, i int) []Listener {
+func del(fs[]*EventListener, i int) []*EventListener {
 	j := len(fs) - 1
 	copy(fs[i:], fs[i+1:])
 	fs[j] = nil
 	fs = fs[:j]
 	return fs
-}
-
-func eq(a Listener, b Listener) bool {
-	return reflect.ValueOf(a).Pointer() == reflect.ValueOf(b).Pointer()
 }
